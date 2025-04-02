@@ -7,7 +7,9 @@ const scrapProductData = async (
   next: NextFunction
 ) => {
   try {
-    const result = await ScrapProductService.extractProduct();
+    const { searchTerm } = req.query;
+    const payload = searchTerm as string;
+    const result = await ScrapProductService.extractProduct(payload);
     res.status(200).json({
       statusCode: 200,
       success: true,
