@@ -1,9 +1,10 @@
 import puppeteer from "puppeteer";
+import { Product } from "../../product/product.model";
 
 // Define TypeScript interfaces
 interface ProductData {
   productTitle?: string;
-  productImage?: string;
+  productImage?: string | null;
   description?: string;
   price?: string;
   review?: string;
@@ -30,7 +31,7 @@ const websiteSelectors: WebsiteSelectorsMap = {
     search: "input[type='search'], input.search-box__input",
     productCard: "[data-qa-locator='product-item']",
     title: " a[title]", // Fixed title selector
-    image: "img[class*='image-'], img[src*='.jpg'], img[src*='.png']",
+    image: "img[type='product']",
     price: "[class*='price-'], [class*='currency-']",
     description: "[class*='description-'], [class*='desc-']",
     review: "[class*='rating-'], [class*='review-']",
@@ -48,7 +49,7 @@ const websiteSelectors: WebsiteSelectorsMap = {
 
 const urls = ["https://www.daraz.com.bd"];
 
-const extractProduct = async (payload: string): Promise<ProductData[]> => {
+const extractProduct = async (payload: string) => {
   const results: ProductData[] = [];
 
   for (const url of urls) {
@@ -94,9 +95,14 @@ const extractProduct = async (payload: string): Promise<ProductData[]> => {
               return el ? el.textContent?.trim() : "";
             };
 
+            const imageElement = card.querySelector(selectorsArg.image);
+            const productImage = imageElement
+              ? imageElement.getAttribute("src")
+              : "";
+
             return {
               productTitle: getContent(selectorsArg.title),
-
+              productImage,
               source: domainArg,
             };
           });
@@ -106,7 +112,7 @@ const extractProduct = async (payload: string): Promise<ProductData[]> => {
       );
 
       console.log(`Extracted ${products.length} products from ${url}`);
-      results.push(...products); // Filter out empty titles
+      results.push(...products);
     } catch (error) {
       console.error(
         `Error scraping ${url}:`,
@@ -117,7 +123,16 @@ const extractProduct = async (payload: string): Promise<ProductData[]> => {
     }
   }
 
-  return results;
+  if (results.length > 0) {
+    for (const result of results) {
+      const productData = await Product.findOne({
+        productTitle: result.productTitle,
+      });
+      if (!productData) {
+        await Product.create(result);
+      }
+    }
+  }
 };
 
 export const ScrapProductService = {
